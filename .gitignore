@@ -1,0 +1,6 @@
+StarCraftII/
+.devcontainer/.vscode-server
+.venv/
+__pycache__/
+*.py[cod]
+**/__pycache__/
