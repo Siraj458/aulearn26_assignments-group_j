@@ -2,6 +2,9 @@
 ### Members
 Jean-Pierre $\mathbb R$unge, $\mathbb C$hristian Jagst, Siraj Bhattarai, Asif Kareem
 
+## Video Presentation of Assignment 1
+https://cloud.rz.uni-kiel.de/index.php/s/93ynbz8TtNicWSe
+
 ## IMPORTANT: Starting Lines for our `run_ql.py`
 We've added some extra options in `run_ql.py`. So in order to run our agents, use these lines.
 
@@ -19,4 +22,5 @@ We've added some extra options in `run_ql.py`. So in order to run our agents, us
 
 - **Load our best trained SARSA-agent and run in evaluation mode**
 `uv run python run_ql.py --agent sarsa --mode eval --episodes 20 --web --load models/SARSAAgent/MoveToBeaconDiscreteEnv/260512_2139_SARSAAgent_MoveToBeaconDiscreteEnv.pkl --action-mode discrete`
+
 
