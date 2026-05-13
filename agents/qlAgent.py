@@ -40,7 +40,7 @@ class QLearningAgent(AbstractAgent):
         state_key = str(state)
         if not state_key in self.q_table:
             # TensorDict uses strings as keys. States are discrete (rounded integer) here.
-            self.q_table[state_key] = torch.zeros(self.num_actions) # + 0.5 # + np.random.random()
+            self.q_table[state_key] = torch.zeros(self.num_actions) + 0.5 # + np.random.random()
 
 
         # Action selection with Epsilon-Greedy (Policy)
@@ -56,8 +56,14 @@ class QLearningAgent(AbstractAgent):
             # This prevents using always the first index/action, resulting that the Agent is getting stuck at beginning. 
             indices = np.where(q_values == max_q)[0]
             action = np.random.choice(indices)
+            # Alternatively: Just pick the first max value index (worse learning perfomance!)
+            #action = indices[0]
 
         # Decreasing epsilon (chance of exploring), but only down to the minimum (default 10%)
+        # NOTE: We chose to do this here and we later noticed that the epsilon value would decay down to ~0.3 after just one episode!
+        #       We also tested much slower decay rates which reached the min value after about 250 episodes.
+        #       Alternatively, we could apply the decay once after each episode, but our method
+        #       should be fine, as long as the decay value is adjusted accordingly!
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
 
         return action
@@ -76,7 +82,7 @@ class QLearningAgent(AbstractAgent):
             # As we looking for the next state, we need to check if it has an entry in the table
             next_state_key = str(next_state)
             if not next_state_key in self.q_table:
-                self.q_table[next_state_key] = torch.zeros(self.num_actions) # + 0.5 # + np.random.random()
+                self.q_table[next_state_key] = torch.zeros(self.num_actions) + 0.5 # + np.random.random()
 
             # NOTE: Q-Learning
             # Max Q-value of the next state (off-policy) -> expecting to use the best action next
