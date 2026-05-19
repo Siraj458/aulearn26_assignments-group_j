@@ -7,7 +7,9 @@ from absl import logging as absl_logging
 
 from agents.qlAgent import QLearningAgent
 from agents.sarsaAgent import SARSAAgent
-from env.move_to_beacon_discrete_env import MoveToBeaconDiscreteEnv
+from agents.dqnAgent import DQNAgent
+from env.move_to_beacon_discrete_env import MoveToBeaconDiscreteEnv # Assignment 1
+from env.move_to_beacon_full_env import MoveToBeaconFullEnv # Assignment 2
 from runner.runner import Runner
 
 # pysc2 routine, do not touch
@@ -17,9 +19,9 @@ FLAGS(sys.argv[:1])
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run Q-learning agent or SARSA Agent on MoveToBeaconDiscreteEnv."
+        description="Run an Q-learning agent (ql, sarsa, dqn) on the MoveToBeacon environment."
     )
-    parser.add_argument("--agent", choices=["ql", "sarsa"], required=True) # Changed options for Q-learning or SARSA
+    parser.add_argument("--agent", choices=["ql", "sarsa", "dqn"], required=True) # Changed options for different agents
     parser.add_argument("--mode", choices=["train", "eval"], default="eval") # Added option if agent should train or just evaluate
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--visualize", action="store_true")
@@ -38,21 +40,36 @@ def main():
     logging.basicConfig(level=getattr(logging, args.loglevel))
     absl_logging.set_verbosity(getattr(absl_logging, args.loglevel))
 
-    env = MoveToBeaconDiscreteEnv(
-        is_visualize=args.visualize,
-        enable_web=args.web,
-        step_mul=args.step_mul,
-        action_mode=args.action_mode,
-    )
+    if args.action_mode == "discrete":
+        env = MoveToBeaconDiscreteEnv(
+            is_visualize=args.visualize,
+            enable_web=args.web,
+            step_mul=args.step_mul,
+            action_mode=args.action_mode,
+        )
+    else: # Full continous environment
+        env = MoveToBeaconFullEnv(
+            is_visualize=args.visualize,
+            enable_web=args.web,
+            step_mul=args.step_mul,
+            action_mode="continuous",
+        )
+
     # Either training or evaluate
     training_mode = args.mode == "train"
-    # Changed to either Q-learner or SARSA
-    agent_cls = QLearningAgent if args.agent == "ql" else SARSAAgent
+    # Agents from Assignment 1 & 2
+    if args.agent == "dqn":
+        agent_cls = DQNAgent
+    elif args.agent == "sarsa":
+        agent_cls = SARSAAgent
+    else: # Default is Q-learner
+        agent_cls = QLearningAgent
 
 
-    # Load a  model if given and recreate the agent from that.
+    # Load a model if given and recreate the agent from that.
     if args.load:
         # Need to give whole path + filename -> e.g. models/QLearningAgent/MoveToBeaconDiscreteEnv/...pkl
+        # NOTE: dqn has also arguments `reset_timesteps=False, load_memory=True`
         agent = agent_cls.load_model(args.load, not training_mode)
     # Otherwise create new agent
     else:

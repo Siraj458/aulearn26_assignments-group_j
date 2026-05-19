@@ -1,9 +1,14 @@
 # AuLearn26_Assignments-Group_J
 ### Members
-Jean-Pierre $\mathbb R$unge, $\mathbb C$hristian Jagst, Siraj Bhattarai, Asif Kareem
+Jean-Pierre $\mathbb R$unge, $\mathbb C$hristian Jagst, Siraj Bhattarai
 
 ## Video Presentation of Assignment 1
 https://cloud.rz.uni-kiel.de/index.php/s/93ynbz8TtNicWSe
+
+## Assignment 2  
+Now the runner for training the dqn-agent in continuous environment can be started with:  
+`uv run python run_ql.py --agent dqn --mode train --episodes 100 --web --action-mode continuous`
+
 
 ## IMPORTANT: Starting Lines for our `run_ql.py`
 We've added some extra options in `run_ql.py`. So in order to run our agents, use these lines.
