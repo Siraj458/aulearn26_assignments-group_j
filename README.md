@@ -7,7 +7,7 @@ https://cloud.rz.uni-kiel.de/index.php/s/93ynbz8TtNicWSe
 
 ## Assignment 2  
 Now the runner for training the dqn-agent in the discrete/full environment with discrete actions can be started with:  
-`uv run python run_ql.py --agent dqn --mode train --episodes 100 --web --env discrete --action-mode discrete`
+`uv run python run_ql.py --agent dqn --mode train --episodes 100 --web --env discrete --action-mode discrete`  
 `uv run python run_ql.py --agent dqn --mode train --episodes 100 --web --env full --action-mode discrete`
 
 
