@@ -31,7 +31,7 @@ class DQNAgent(AbstractAgent):
         self.replay_memory = ReplayMemory(capacity=memory_capacity, batch_size=batch_size)
 
         # Neural Network for the DQN-Agent depending on the environment
-        if False:
+        if discrete_environment:
             self.network = DQN_Discrete(input_size=2, hidden_size=64, output_size=action_shape[0])
         else:
             self.network = DQN_Full(input_size=2, output_size=action_shape[0])
