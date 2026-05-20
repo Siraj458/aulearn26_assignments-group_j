@@ -29,6 +29,7 @@ def main():
     parser.add_argument("--step-mul", type=int, default=8)
     parser.add_argument("--save", action="store_true") # Added option to save model during training.
     parser.add_argument("--load", type=str) # Added option to load a given model (from path + pickle file) beforehand.
+    parser.add_argument("--env", choices=["discrete", "full"], default="discrete") # Added option for selecting environment
     parser.add_argument("--action-mode", choices=["discrete", "continuous"], default="discrete")
     parser.add_argument(
         "--loglevel",
@@ -40,7 +41,7 @@ def main():
     logging.basicConfig(level=getattr(logging, args.loglevel))
     absl_logging.set_verbosity(getattr(absl_logging, args.loglevel))
 
-    if args.action_mode == "discrete":
+    if args.env == "discrete":
         env = MoveToBeaconDiscreteEnv(
             is_visualize=args.visualize,
             enable_web=args.web,
@@ -52,7 +53,8 @@ def main():
             is_visualize=args.visualize,
             enable_web=args.web,
             step_mul=args.step_mul,
-            action_mode="continuous",
+            # NOTE: Here discrete actions are in range 0-31, continous would be infinite from -1 to 1 
+            action_mode=args.action_mode,
         )
 
     # Either training or evaluate
@@ -65,6 +67,7 @@ def main():
     else: # Default is Q-learner
         agent_cls = QLearningAgent
 
+    # TODO: Rework this section, DQNAgent needs some more arguments
 
     # Load a model if given and recreate the agent from that.
     if args.load:
