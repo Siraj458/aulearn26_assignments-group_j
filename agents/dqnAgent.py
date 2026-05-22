@@ -28,111 +28,107 @@ class DQNAgent(AbstractAgent):
         self.epsilon_decay = 1 - epsilon_decay
         self.epsilon_min = epsilon_min
 
+        # New stuff -------------------------------- 
         self.target_update_freq = target_update_freq
         self.learn_after_steps = learn_after_steps
 
         # Initilize our implemented Replay Memory
         self.replay_memory = ReplayMemory(capacity=memory_capacity, batch_size=batch_size)
+        self.replay_ratio = 1
 
+        # NOTE: For the smaller network (discrete env) cpu could work just fine
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # Neural Network for the DQN-Agent depending on the environment
         if discrete_environment:
-            self.network = DQN_Discrete(input_size=2, hidden_size=64, output_size=action_shape[0])
-            self.target_network = DQN_Discrete(input_size=2, hidden_size=64, output_size=action_shape[0])
+            self.q_network = DQN_Discrete(input_size=2, hidden_size=64, output_size=action_shape[0]).to(self.device)
+            self.target_network = DQN_Discrete(input_size=2, hidden_size=64, output_size=action_shape[0]).to(self.device)
         else:
-            self.network = DQN_Full(input_size=2, output_size=action_shape[0])
-            self.target_network = DQN_Full(input_size=2, output_size=action_shape[0])
+            self.q_network = DQN_Full(input_size=2, output_size=action_shape[0]).to(self.device)
+            self.target_network = DQN_Full(input_size=2, output_size=action_shape[0]).to(self.device)
         
         # Copy all network parameters to the target network
-        self.target_network.load_state_dict(self.network.state_dict())
-
+        self.target_network.load_state_dict(self.q_network.state_dict())
         # Only the main network is directly trained.
         # The target network just receives the parameters of the main network every 'target_update_freq' iterations.
-        # NOTE: The main network is NOT set to train ONLY for the get_action step!
-        #       Currently, the network is only trained from replay memory.
-        #       BUT maybe there is a good way to also train during get_action()???
-        self.network.eval()
         self.target_network.eval()
 
         # Setup the loss function and the optimizer
         self.loss_fn = nn.MSELoss(reduction="sum")
-        self.optimizer = torch.optim.Adam(self.network.parameters())
+        self.optimizer = torch.optim.Adam(self.q_network.parameters())
 
         # 8 in discrete_env, 32 in full_env
         self.num_actions = action_shape[0]
         # Count the total amount of update steps
         self.step_count = 0
 
-        # NOTE: Only for testing Network
-        #print(self.network.forward(torch.randn(1, 2, 32, 32)))
-
 
     
 
     def get_action(self, state):
-        # TODO: Action Selection 
+        # NOTE: Either 0-7 for discrete or 0-31 for full environment
 
         # Action selection with Epsilon-Greedy (Policy)
         # Explore when below epsilon -> epsilon = exploration chance
         if np.random.random() < self.epsilon:
             action = np.random.randint(self.num_actions)
+       
         # Otherwise Exploit instead
         else:
             # Determine max Q-value for this state.
             # The network expects a floating point tensor as an input. (torch.float = torch.float32)
-            state_tensor = torch.tensor(state, dtype=torch.float)
-            # This calls .forward() implicitly
-            # TODO: Think about if we should use network or target_network here!
-            #       If we use "target_network", we could keep "network" in training mode the whole time (maybe that can be done anyways?)
-            q_values = self.network(state_tensor)
+            state_tensor = torch.tensor(state, dtype=torch.float, device=self.device)
 
-            # NOTE: We have to decide if we still want to do this "smart/random" argmax
-            #       or just the default argmax with more exploration in the beginning!!!
-            #       ===> since we start with random network weights, it should be HIGHLY unlikely that there are any identical q values in the first place!!!
-            ###max_q = torch.max(q_values)
-            #### When there are multiple max Q-values, choose a random.
-            #### This prevents using always the first index/action, resulting that the Agent is getting stuck at beginning. 
-            ###indices = np.where(q_values == max_q)[0]
-            ###action = np.random.choice(indices)
-
+            # NOTE: From simply using the forward pass of the network, we won't train the weights.
+            #       HOWEVER whe need to disable some layer functions like Dropout or Batch-Norm with .eval().
+            #       AND PyTorch keeps track of the calculations, to make later gradient computation more easily.
+            #       By disabling that with no_grad(), we save us some memory.  
+            self.q_network.eval()
+            with torch.no_grad():
+                q_values = self.q_network(state_tensor) # This calls .forward() implicitly
             action = torch.argmax(q_values)
-
-        # NOTE: Either 0-7 for discrete or 0-31 for full environment
+    
         return action
     
+
+
     def update(self, state, action, reward, next_state, done):
         # TODO: Update logic for training the agent (You could also add transitions)
 
-        # Store transition in replay memory
-        # Replay ratio 1/4
+        # Store transition in replay memory (e.g. with a replay ratio 1/4)
         # NOTE: This seemed to make the training worse, but maybe there are situations where this is helpful?
-        #if self.step_count % 4 == 0:
-        #    self.replay_memory.add(state, action, reward, next_state, done)
-        
-        #self.replay_memory.add(state, action, reward, next_state, done)
+        # TODO: DOES IT WORK THIS WAY?
+        if self.step_count % self.replay_ratio == 0:
+            self.replay_memory.add(state, action, reward, next_state, done)
+
         
         ########## Train the main network ##########
+        # Only train, if we have enough samples for one batch.
         if self.step_count >= self.learn_after_steps:
+            self.q_network.train()
+            # From sample() we get a list
             mini_batch = self.replay_memory.sample()
+            # The * unzips the outer list from sample(), while the zip() zips the content element wise into new lists.
+            states, actions, rewards, next_states, dones = zip(*mini_batch)
 
-            # TODO: It is inefficient to loop 5 times over the mini_batch! <--- Improve this!
-            #       There are many ways to do this. We could also modify the ReplayMemory class if that helps.
             # torch.tensor is faster if we call np.array before, IF we have a list of ndarrays (applies to state & next_state)
-            state_tensor = torch.tensor(np.array([i[0] for i in mini_batch]), dtype=torch.float)
-            action_tensor = torch.tensor([i[1] for i in mini_batch], dtype=torch.int)
-            reward_tensor = torch.tensor([i[2] for i in mini_batch], dtype=torch.float)
-            next_state_tensor = torch.tensor(np.array([i[3] for i in mini_batch]), dtype=torch.float)
-            done_tensor = torch.tensor([i[4] for i in mini_batch], dtype=torch.float)
+            state_tensor = torch.tensor(np.array(states), dtype=torch.float, device=self.device)
+            action_tensor = torch.tensor(actions, dtype=torch.int, device=self.device)
+            reward_tensor = torch.tensor(rewards, dtype=torch.float, device=self.device)
+            next_state_tensor = torch.tensor(np.array(next_states), dtype=torch.float, device=self.device)
+            done_tensor = torch.tensor(dones, dtype=torch.float, device=self.device)
 
-            # Set our network to training mode
-            self.network.train()
+
             # Our predictions
-            q_values = self.network(state_tensor)
-            # Select the q value of the action that was performed at each state transition
+            q_values = self.q_network(state_tensor)
+            # Select only the q value of the action that was performed at each state transition
             q_values = q_values[torch.arange(q_values.shape[0]), action_tensor]
 
             # This replaces "q_next = torch.max(self.q_table[next_state_key])" from assignment 1
-            # [0] contains the max values and [1] the corresponding indices
-            q_values_target = torch.max(self.target_network(next_state_tensor), dim=1)[0]
+            # NOTE: We don't want to train the target_network
+            with torch.no_grad():
+                # [0] contains the max values and [1] the corresponding indices
+                q_values_target = torch.max(self.target_network(next_state_tensor), dim=1)[0]
+
 
             # NOTE: There may be more elegant/effictient ways to do implement this logic.
             #       E.g. if we know we are done, we don't need to use the target network for this state transition.
@@ -142,28 +138,27 @@ class DQNAgent(AbstractAgent):
 
             expected_return = reward_tensor + self.discount_factor * q_values_target
 
+            # Loss between our current Q-values and the target Q-values.
             loss = self.loss_fn(q_values, expected_return)
             self.optimizer.zero_grad()
             loss.backward()
-            #running_loss += loss.item()
             self.optimizer.step()
-
-            # Set the network back to eval mode for the next get_action call
-            # TODO: Check if this makes sense!
-            self.network.eval()
 
             if self.step_count % self.target_update_freq == 0:
                 # Copy all network parameters to the target network
-                self.target_network.load_state_dict(self.network.state_dict())
+                self.target_network.load_state_dict(self.q_network.state_dict())
                 
         self.step_count += 1
 
         # Decreasing epsilon (chance of exploring), but only down to the minimum (default 10%)
-        #if done:
-        #    self.epsilon = max(self.epsilon - self.epsilon_decay, self.epsilon_min)
-        # During testing it was way better to decrease epsilon down to epsilon min after 1 or 2 episodes...
-        # But it was requested that the decay should take half the total episodes to reach epsilon_min!?
-        self.epsilon = max(self.epsilon - self.epsilon_decay, self.epsilon_min)
+        # NOTE: During testing it was way better to decrease epsilon down to epsilon min after 1 or 2 episodes
+        # But it was requested that the decay should take half the total episodes to reach epsilon_min
+        if done:
+            self.epsilon = max(self.epsilon - self.epsilon_decay, self.epsilon_min)
+
+
+
+
 
     def save_model(self, path, filename="dqn.pt"):
         # TODO: Save the learnable parameters of your model and the hyperparameters

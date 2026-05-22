@@ -67,7 +67,7 @@ def main():
     else: # Default is Q-learner
         agent_cls = QLearningAgent
 
-    # TODO: Rework this section, DQNAgent needs some more arguments
+    # TODO: Rework this section, DQNAgent needs some more arguments -> Discrete_Environment = TRUE / FALSE !!!!!!!!
 
     # Load a model if given and recreate the agent from that.
     if args.load:
