@@ -67,20 +67,29 @@ def main():
     else: # Default is Q-learner
         agent_cls = QLearningAgent
 
-    # TODO: Rework this section, DQNAgent needs some more arguments -> Discrete_Environment = TRUE / FALSE !!!!!!!!
 
     # Load a model if given and recreate the agent from that.
     if args.load:
         # Need to give whole path + filename -> e.g. models/QLearningAgent/MoveToBeaconDiscreteEnv/...pkl
         # NOTE: dqn has also arguments `reset_timesteps=False, load_memory=True`
         agent = agent_cls.load_model(args.load, not training_mode)
+    
     # Otherwise create new agent
+        
     else:
         if training_mode:
-            agent = agent_cls(
-                observation_space=env.observation_space,
-                action_shape=env.action_shape,
+            # NOTE: Initialize different neural networks for the DQN-agent depending on the environment
+            if agent_cls == DQNAgent and type(env) is MoveToBeaconFullEnv:
+                agent = agent_cls(
+                    observation_space=env.observation_space,
+                    action_shape=env.action_shape,
+                    discrete_environment=False
             )
+            else:
+                agent = agent_cls(
+                    observation_space=env.observation_space,
+                    action_shape=env.action_shape,
+                )
         else:
             # If in eval mode, we don't need to explore (exploring without learning is meaningless)
             agent = agent_cls(
